@@ -1,0 +1,40 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const config = {
+  port: process.env.PORT || 3000,
+  nodeEnv: process.env.NODE_ENV || 'development',
+  
+  // OpenAI
+  openai: {
+    apiKey: process.env.OPENAI_API_KEY,
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+  },
+  
+  // Supabase
+  supabase: {
+    url: process.env.SUPABASE_URL || 'https://ydsjrhnrsnfefhuefgul.supabase.co',
+    key: process.env.SUPABASE_KEY,
+  },
+  
+  // Resend (for email)
+  resend: {
+    apiKey: process.env.RESEND_API_KEY,
+    fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+  },
+  
+  // Webhook security
+  webhook: {
+    secret: process.env.WEBHOOK_SECRET,
+  },
+};
+
+// Validation
+const requiredEnvVars = ['OPENAI_API_KEY', 'SUPABASE_KEY', 'RESEND_API_KEY'];
+const missing = requiredEnvVars.filter(key => !process.env[key]);
+
+if (missing.length > 0 && process.env.NODE_ENV !== 'test') {
+  console.error(`Missing required environment variables: ${missing.join(', ')}`);
+  process.exit(1);
+}

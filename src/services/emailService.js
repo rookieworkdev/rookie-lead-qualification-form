@@ -1,0 +1,227 @@
+import { Resend } from 'resend'
+import { config } from '../config/env.js'
+import { logger } from '../utils/logger.js'
+
+const resend = new Resend(config.resend.apiKey)
+
+/**
+ * Generates the HTML email template
+ */
+function generateEmailHTML(jobAd) {
+	return `<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+
+  <style>
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      line-height: 1.55;
+      color: #111827;
+      background: #f9fafb;
+      margin: 0;
+      padding: 0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .header {
+      background: transparent;
+      color: #111827;
+      padding: 0 0 24px 0;
+      text-align: left;
+      border-radius: 0;
+    }
+
+    .header h1 {
+      font-size: 28px;
+      font-weight: 600;
+      margin: 0 0 8px 0;
+    }
+
+    .header p {
+      margin: 0;
+      font-size: 15px;
+      color: #4b5563;
+    }
+
+    .content {
+      background: #ffffff;
+      padding: 16px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.04);
+    }
+
+    .section {
+      background: #ffffff;
+      padding: 0;
+      margin: 0 0 32px 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+
+    .section h2 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .section > p {
+      color: #4b5563;
+      font-size: 14px;
+    }
+
+    .job-description h2 {
+      font-size: 16px;
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #111827;
+    }
+
+    .job-description p,
+    .job-description li {
+      font-size: 14px;
+      color: #374151;
+    }
+
+    .job-description ul {
+      padding-left: 18px;
+    }
+
+    .candidate {
+      background: #f9fafb;
+      padding: 16px;
+      margin: 16px 0;
+      border-radius: 8px;
+    }
+
+    .candidate h4 {
+      margin: 0 0 8px 0;
+      font-size: 15px;
+    }
+
+    .dummy-badge {
+      background: #fff7ed;
+      color: #9a3412;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-block;
+      margin: 12px 0;
+    }
+
+    .button {
+      background: linear-gradient(90deg, #16a34a, #22c55e);
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 999px;
+      display: inline-block;
+      margin-top: 16px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .footer-note {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Tack för din förfrågan!</h1>
+      <p>Vi har tagit emot ditt personalbehov och börjat arbeta på det.</p>
+    </div>
+
+    <div class="content">
+      <div class="section">
+        <h2>Utkast till jobbannons</h2>
+        <p>Baserat på din beskrivning har vi skapat ett förslag:</p>
+
+        <h3>${jobAd.title}</h3>
+        <h4>${jobAd.company}</h4>
+        <div class="job-description">${jobAd.description}</div>
+
+        <p><em>Du kan redigera och slutföra denna annons i företagsportalen.</em></p>
+      </div>
+
+      <div class="section">
+        <h2>Potentiella kandidater</h2>
+        <span class="dummy-badge">EXEMPEL – DUMMY DATA</span>
+        <p>Här är några exempel på kandidatprofiler som skulle kunna passa:</p>
+
+        <div class="candidate">
+          <h4>Kandidat A (EXEMPEL)</h4>
+          <p><strong>Bakgrund:</strong> 3 års erfarenhet, stark teknisk profil med fokus på projektledning</p>
+          <p><strong>Kompetenser:</strong> analytisk förmåga, ledarskapsförmåga</p>
+          <p><strong>Utbildning:</strong> Civilingenjör + certifieringar</p>
+        </div>
+
+        <div class="candidate">
+          <h4>Kandidat B (EXEMPEL)</h4>
+          <p><strong>Bakgrund:</strong> Junior profil med 2+ års erfarenhet, strategisk förståelse</p>
+          <p><strong>Kompetenser:</strong> affärsutveckling, projektledning, coaching</p>
+          <p><strong>Utbildning:</strong> Kandidatexamen inom relevant område</p>
+        </div>
+
+        <p><strong>OBS:</strong> Ovanstående är exempel. Riktiga kandidater visas när annonsen slutförts.</p>
+      </div>
+
+      <div class="section" style="text-align: center;">
+        <h2>Nästa steg</h2>
+        <ul style="text-align: left;">
+          <li>Slutföra och publicera jobbannonsen</li>
+          <li>Se riktiga kandidatförslag</li>
+          <li>Boka intervjuer direkt i systemet</li>
+        </ul>
+
+        <a href="https://portal.rookie.se" class="button">Gå till företagsportalen</a>
+
+        <p class="footer-note">Om du har frågor, svara på detta mejl eller ring oss.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+/**
+ * Sends the confirmation email to the lead using Resend
+ */
+export async function sendEmailToLead(leadEmail, jobAd) {
+	try {
+		logger.info('Sending email to lead via Resend', { email: leadEmail })
+
+		// For testing without verified domain, send to Rookie account only
+		// Original lead email included in subject for tracking
+		const { data, error } = await resend.emails.send({
+			from: config.resend.fromEmail,
+			to: 'rookiework.dev@gmail.com',
+			subject: `Tack för din förfrågan till Rookie - Vi har kandidater! [Lead: ${leadEmail}]`,
+			html: generateEmailHTML(jobAd),
+		})
+
+		if (error) {
+			throw error
+		}
+
+		logger.info('Email sent successfully via Resend', {
+			emailId: data.id,
+			to: leadEmail,
+		})
+
+		return data
+	} catch (error) {
+		logger.error('Error sending email via Resend', error)
+		throw new Error(`Failed to send email: ${error.message}`)
+	}
+}
