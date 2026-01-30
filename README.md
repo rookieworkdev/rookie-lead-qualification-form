@@ -1,4 +1,4 @@
-# Trigger deployment test
+# New trigger deployment test after making repo public again
 
 # Rookie Recruitment Webhook
 
