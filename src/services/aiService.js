@@ -1,14 +1,14 @@
-import OpenAI from 'openai';
-import { config } from '../config/env.js';
-import { logger } from '../utils/logger.js';
+import OpenAI from 'openai'
+import { config } from '../config/env.js'
+import { logger } from '../utils/logger.js'
 
 const openai = new OpenAI({
-  apiKey: config.openai.apiKey,
-});
+	apiKey: config.openai.apiKey,
+})
 
 /**
  * System prompt for the Scoring AI Agent
- * Copied directly from the n8n flow
+ * Copied directly from the original n8n flow
  */
 const SCORING_SYSTEM_PROMPT = `# Rookie Lead Qualification Prompt
 
@@ -195,11 +195,11 @@ E-post*: john567@gmail.com
 Telefon:
 Beskriv ditt personalbehov:
 Win money fast! Visit www.get-rich-quick.biz to claim your prize.
-`;
+`
 
 /**
  * System prompt for Job Ad Generation
- * Copied directly from the n8n flow
+ * Copied directly from the original n8n flow
  */
 const JOB_AD_SYSTEM_PROMPT = `You are a professional recruitment copywriter for Rookie AB, a Swedish recruitment agency. Generate compelling, professional job ads in Swedish that attract qualified candidates. Focus on clarity, professionalism, and highlighting opportunities.
 
@@ -243,15 +243,15 @@ Questions and application
 
 In this recruitment, Autoliv is collaborating with Rookie. Apply for the job by submitting your CV and cover letter. If you have any questions, please contact the responsible recruiter, Håkan Olsson at hakan.olsson@rookiework.se or 072 55 55 712.
 
-Please submit your application as soon as possible.`;
+Please submit your application as soon as possible.`
 
 /**
  * Scores a lead using OpenAI
- * Replicates the "Scoring AI Agent" node
+ * Replicates the "Scoring AI Agent" node in original n8n flow
  */
 export async function scoreLead(leadData) {
-  try {
-    const userPrompt = `Analyze this lead submission:
+	try {
+		const userPrompt = `Analyze this lead submission:
 
 Company Name: ${leadData.company_name}
 Contact Name: ${leadData.full_name}
@@ -268,50 +268,50 @@ Provide your analysis in this exact JSON format:
 "classification": "valid_lead | invalid_lead | likely_candidate | likely_spam",
 "key_requirements": ["requirement1", "requirement2"],
 "ai_reasoning": "<short explanation of why this classification and score were assigned>"
-}`;
+}`
 
-    logger.info('Calling OpenAI for lead scoring');
+		logger.info('Calling OpenAI for lead scoring')
 
-    const response = await openai.chat.completions.create({
-      model: config.openai.model,
-      messages: [
-        { role: 'system', content: SCORING_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: config.openai.temperature,
-    });
+		const response = await openai.chat.completions.create({
+			model: config.openai.model,
+			messages: [
+				{ role: 'system', content: SCORING_SYSTEM_PROMPT },
+				{ role: 'user', content: userPrompt },
+			],
+			temperature: config.openai.temperature,
+		})
 
-    const content = response.choices[0].message.content;
-    
-    // Parse the response (remove markdown code blocks if present)
-    const cleanContent = content
-      .replace(/^```json\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+		const content = response.choices[0].message.content
 
-    const parsed = JSON.parse(cleanContent);
+		// Parse the response (remove markdown code blocks if present)
+		const cleanContent = content
+			.replace(/^```json\s*/i, '')
+			.replace(/\s*```\s*$/, '')
+			.trim()
 
-    logger.info('Lead scoring complete', {
-      classification: parsed.classification,
-      score: parsed.lead_score,
-    });
+		const parsed = JSON.parse(cleanContent)
 
-    return parsed;
-  } catch (error) {
-    logger.error('Error scoring lead', error);
-    throw new Error(`AI scoring failed: ${error.message}`);
-  }
+		logger.info('Lead scoring complete', {
+			classification: parsed.classification,
+			score: parsed.lead_score,
+		})
+
+		return parsed
+	} catch (error) {
+		logger.error('Error scoring lead', error)
+		throw new Error(`AI scoring failed: ${error.message}`)
+	}
 }
 
 /**
  * Generates a job ad draft using OpenAI
- * Replicates the "Generate Job Ad Draft" node
+ * Replicates the "Generate Job Ad Draft" node in original n8n flow
  */
 export async function generateJobAd(leadData, normalizedData) {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    
-    const userPrompt = `Generate a professional Swedish job ad based on this form submission:
+	try {
+		const today = new Date().toISOString().split('T')[0]
+
+		const userPrompt = `Generate a professional Swedish job ad based on this form submission:
 
 Company: ${leadData.company_name}
 Industry: ${leadData.industry}
@@ -329,34 +329,34 @@ Return ONLY valid JSON in this format:
   "category": "${normalizedData.role_category}",
   "external_url": "https://rookiework.se/jobs/[generate-slug-from-title]",
   "posted_date": "${today}"
-}`;
+}`
 
-    logger.info('Calling OpenAI for job ad generation');
+		logger.info('Calling OpenAI for job ad generation')
 
-    const response = await openai.chat.completions.create({
-      model: config.openai.model,
-      messages: [
-        { role: 'system', content: JOB_AD_SYSTEM_PROMPT },
-        { role: 'user', content: userPrompt },
-      ],
-      temperature: config.openai.temperature,
-    });
+		const response = await openai.chat.completions.create({
+			model: config.openai.model,
+			messages: [
+				{ role: 'system', content: JOB_AD_SYSTEM_PROMPT },
+				{ role: 'user', content: userPrompt },
+			],
+			temperature: config.openai.temperature,
+		})
 
-    const content = response.choices[0].message.content;
-    
-    // Parse the response
-    const cleanContent = content
-      .replace(/^```json\s*/i, '')
-      .replace(/\s*```\s*$/, '')
-      .trim();
+		const content = response.choices[0].message.content
 
-    const parsed = JSON.parse(cleanContent);
+		// Parse the response
+		const cleanContent = content
+			.replace(/^```json\s*/i, '')
+			.replace(/\s*```\s*$/, '')
+			.trim()
 
-    logger.info('Job ad generation complete', { title: parsed.title });
+		const parsed = JSON.parse(cleanContent)
 
-    return parsed;
-  } catch (error) {
-    logger.error('Error generating job ad', error);
-    throw new Error(`Job ad generation failed: ${error.message}`);
-  }
+		logger.info('Job ad generation complete', { title: parsed.title })
+
+		return parsed
+	} catch (error) {
+		logger.error('Error generating job ad', error)
+		throw new Error(`Job ad generation failed: ${error.message}`)
+	}
 }

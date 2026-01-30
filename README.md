@@ -1,3 +1,5 @@
+# Trigger deployment test
+
 # Rookie Recruitment Webhook
 
 A production-ready Express.js implementation of the Rookie recruitment lead processing workflow, converted from N8n.
@@ -34,7 +36,7 @@ Switch: valid_lead | invalid_lead | likely_candidate | likely_spam
 
 ## Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - OpenAI API key
 - Supabase project with required tables
 - Gmail account with App Password
@@ -92,6 +94,7 @@ To send emails, you need a Gmail App Password:
 Your Supabase database needs these tables:
 
 #### 1. `companies`
+
 ```sql
 CREATE TABLE companies (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -103,6 +106,7 @@ CREATE TABLE companies (
 ```
 
 #### 2. `signals`
+
 ```sql
 CREATE TABLE signals (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -115,6 +119,7 @@ CREATE TABLE signals (
 ```
 
 #### 3. `rejected_leads`
+
 ```sql
 CREATE TABLE rejected_leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -131,6 +136,7 @@ CREATE TABLE rejected_leads (
 ```
 
 #### 4. `candidate_leads`
+
 ```sql
 CREATE TABLE candidate_leads (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -145,6 +151,7 @@ CREATE TABLE candidate_leads (
 ```
 
 #### 5. `contacts`
+
 ```sql
 CREATE TABLE contacts (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -159,6 +166,7 @@ CREATE TABLE contacts (
 ```
 
 #### 6. `website_jobs`
+
 ```sql
 CREATE TABLE website_jobs (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -241,52 +249,58 @@ npm start
 ### API Endpoints
 
 #### POST /api/webhook
+
 Main webhook endpoint for form submissions.
 
 **Request Body:**
+
 ```json
 {
-  "name": "John Doe",
-  "email": "john@company.com",
-  "phone": "+46701234567",
-  "company": "Tech AB",
-  "industry": "technology",
-  "service_type": "direktrekrytering",
-  "message": "We need to hire a senior developer...",
-  "subject": "Recruitment inquiry"
+	"name": "John Doe",
+	"email": "john@company.com",
+	"phone": "+46701234567",
+	"company": "Tech AB",
+	"industry": "technology",
+	"service_type": "direktrekrytering",
+	"message": "We need to hire a senior developer...",
+	"subject": "Recruitment inquiry"
 }
 ```
 
 **Response (Valid Lead):**
+
 ```json
 {
-  "success": true,
-  "message": "Valid lead processed successfully",
-  "classification": "valid_lead",
-  "lead_score": 85,
-  "job_ad_title": "Senior Developer",
-  "processingTime": 3450
+	"success": true,
+	"message": "Valid lead processed successfully",
+	"classification": "valid_lead",
+	"lead_score": 85,
+	"job_ad_title": "Senior Developer",
+	"processingTime": 3450
 }
 ```
 
 **Response (Spam):**
+
 ```json
 {
-  "success": true,
-  "message": "Lead classified as spam",
-  "classification": "likely_spam",
-  "processingTime": 1200
+	"success": true,
+	"message": "Lead classified as spam",
+	"classification": "likely_spam",
+	"processingTime": 1200
 }
 ```
 
 #### GET /api/health
+
 Health check endpoint.
 
 **Response:**
+
 ```json
 {
-  "status": "healthy",
-  "timestamp": "2026-01-28T10:30:00.000Z"
+	"status": "healthy",
+	"timestamp": "2026-01-28T10:30:00.000Z"
 }
 ```
 
@@ -357,22 +371,26 @@ recruitment-webhook/
 The AI classifies leads into 4 categories:
 
 ### 1. `valid_lead`
+
 - Professional recruitment needs
 - White-collar roles (ekonom, ingenjör, tekniker, etc.)
 - Company email domain preferred
 - **Action:** Generate job ad, send email
 
 ### 2. `invalid_lead`
+
 - Personal email + no company context
 - Out-of-scope roles (manual labor, healthcare, teaching)
 - **Action:** Store in rejected_leads
 
 ### 3. `likely_candidate`
+
 - Job seekers (not employers)
 - Personal email describing themselves
 - **Action:** Store in candidate_leads
 
 ### 4. `likely_spam`
+
 - Promotional content
 - Malicious links
 - Incoherent text
@@ -393,6 +411,7 @@ CMD ["node", "src/index.js"]
 ```
 
 Build and run:
+
 ```bash
 docker build -t rookie-webhook .
 docker run -p 3000:3000 --env-file .env rookie-webhook
@@ -437,6 +456,7 @@ Logs are output as structured JSON:
 ```
 
 Recommended: Send logs to a service like:
+
 - Datadog
 - Logtail
 - CloudWatch
@@ -453,6 +473,7 @@ Recommended: Send logs to a service like:
 ## Differences from N8n
 
 This implementation:
+
 - ✅ Exact same logic and prompts
 - ✅ Same classification criteria
 - ✅ Same database operations
@@ -465,6 +486,7 @@ This implementation:
 ## Performance
 
 Expected processing times:
+
 - **Fast Reject (spam):** ~50-200ms
 - **Invalid/Candidate:** ~2-4 seconds (1 AI call)
 - **Valid Lead:** ~8-12 seconds (2 AI calls + email)
@@ -472,20 +494,25 @@ Expected processing times:
 ## Troubleshooting
 
 ### "Missing required environment variables"
+
 Make sure all variables in `.env.example` are set in your `.env` file.
 
 ### "AI scoring failed"
+
 Check your OpenAI API key and quota. The service uses `gpt-4o-mini` model.
 
 ### "Failed to find/create company"
+
 Verify the `find_or_create_company` stored procedure exists in Supabase.
 
 ### "Failed to send email"
+
 Ensure Gmail App Password is correct (not your regular password).
 
 ## Support
 
 For issues or questions:
+
 - Check logs (structured JSON output)
 - Verify environment variables
 - Test with the provided curl command
