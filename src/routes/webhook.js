@@ -16,7 +16,7 @@ import {
   upsertContact,
   createJobAdRecord,
 } from '../services/supabaseService.js';
-import { sendEmailToLead } from '../services/emailService.js';
+import { sendEmailToLead, sendAdminAlert } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -26,12 +26,15 @@ const router = express.Router();
  */
 router.post('/webhook', async (req, res) => {
   const startTime = Date.now();
-  
+
+  // Declare formData outside try block so it's accessible in catch
+  let formData;
+
   try {
     logger.info('Webhook received', { body: req.body });
 
     // Step 1: Edit Fields - Extract and structure the form data
-    const formData = {
+    formData = {
       id: Date.now().toString(),
       full_name: req.body.name,
       email: req.body.email,
@@ -177,11 +180,28 @@ router.post('/webhook', async (req, res) => {
       processingTime: Date.now() - startTime,
     });
 
-    // Return 500 for actual errors
-    return res.status(500).json({
-      success: false,
-      error: 'Internal server error',
-      message: error.message,
+    // Save form data to rejected_leads so it's not lost
+    try {
+      await insertSpamLead(formData, `Processing error: ${error.message}`, 'processing_error');
+      logger.info('Form data saved to rejected_leads after processing failure');
+    } catch (saveError) {
+      logger.error('Failed to save form data after error', saveError);
+      // Continue anyway - we'll still send the alert
+    }
+
+    // Send admin alert email with form data and error details
+    try {
+      await sendAdminAlert(formData, error, 'webhook_processing');
+    } catch (alertError) {
+      logger.error('Failed to send admin alert', alertError);
+      // Continue anyway - data is already saved
+    }
+
+    // Return 200 (not 500) - user doesn't need to know about internal errors
+    // Their data has been saved and admin has been notified
+    return res.status(200).json({
+      success: true,
+      message: 'Submission received and will be processed',
       processingTime: Date.now() - startTime,
     });
   }

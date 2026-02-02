@@ -225,3 +225,154 @@ export async function sendEmailToLead(leadEmail, jobAd) {
 		throw new Error(`Failed to send email: ${error.message}`)
 	}
 }
+
+/**
+ * Generates admin alert email HTML
+ */
+function generateAdminAlertHTML(formData, error, failurePoint) {
+	return `<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #111827;
+      background: #f9fafb;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .alert-header {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 16px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .alert-header h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+    .section {
+      margin-bottom: 20px;
+    }
+    .section h2 {
+      font-size: 16px;
+      color: #374151;
+      margin-bottom: 8px;
+      border-bottom: 2px solid #e5e7eb;
+      padding-bottom: 4px;
+    }
+    .data-item {
+      background: #f9fafb;
+      padding: 8px 12px;
+      margin: 4px 0;
+      border-radius: 4px;
+    }
+    .data-item strong {
+      color: #4b5563;
+    }
+    .error-box {
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      padding: 12px;
+      margin: 12px 0;
+      border-radius: 4px;
+    }
+    .footer {
+      margin-top: 24px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;
+      font-size: 12px;
+      color: #6b7280;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="alert-header">
+      <h1>🚨 Formulärinlämning misslyckades</h1>
+    </div>
+
+    <div class="section">
+      <h2>Felinformation</h2>
+      <div class="error-box">
+        <p><strong>Fel vid:</strong> ${failurePoint}</p>
+        <p><strong>Felmeddelande:</strong> ${error.message || 'Unknown error'}</p>
+        <p><strong>Tidpunkt:</strong> ${new Date().toLocaleString('sv-SE')}</p>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Formulärdata (sparad i rejected_leads)</h2>
+      <div class="data-item"><strong>Namn:</strong> ${formData.full_name || 'N/A'}</div>
+      <div class="data-item"><strong>E-post:</strong> ${formData.email || 'N/A'}</div>
+      <div class="data-item"><strong>Telefon:</strong> ${formData.phone || 'N/A'}</div>
+      <div class="data-item"><strong>Företag:</strong> ${formData.company_name || 'N/A'}</div>
+      <div class="data-item"><strong>Bransch:</strong> ${formData.industry || 'N/A'}</div>
+      <div class="data-item"><strong>Tjänstetyp:</strong> ${formData.service_type || 'N/A'}</div>
+    </div>
+
+    <div class="section">
+      <h2>Beskrivning av behov</h2>
+      <div class="data-item">${formData.needs_description || 'N/A'}</div>
+    </div>
+
+    <div class="footer">
+      <p><strong>Åtgärd:</strong> Formulärdatan har sparats i databasen (rejected_leads tabell med classification='processing_error'). Du kan granska och hantera denna inlämning manuellt via admin-portalen när den är klar.</p>
+      <p><strong>Nästa steg:</strong> Kontrollera felet och försök igen manuellt om nödvändigt.</p>
+    </div>
+  </div>
+</body>
+</html>`
+}
+
+/**
+ * Sends an alert email to admin when form processing fails
+ */
+export async function sendAdminAlert(formData, error, failurePoint = 'webhook_processing') {
+	try {
+		// Check if admin alerts are configured
+		if (!config.adminAlert?.email) {
+			logger.warn('Admin alert email not configured, skipping alert')
+			return null
+		}
+
+		logger.info('Sending admin alert email', {
+			email: config.adminAlert.email,
+			failurePoint,
+		})
+
+		const { data, error: emailError } = await resend.emails.send({
+			from: config.resend.fromEmail,
+			to: config.adminAlert.email,
+			subject: `🚨 Form Submission Failed - ${formData.company_name || 'Unknown Company'}`,
+			html: generateAdminAlertHTML(formData, error, failurePoint),
+		})
+
+		if (emailError) {
+			logger.error('Failed to send admin alert email', emailError)
+			// Don't throw - we don't want alert failures to break the flow
+			return null
+		}
+
+		logger.info('Admin alert email sent successfully', {
+			emailId: data.id,
+		})
+
+		return data
+	} catch (err) {
+		logger.error('Error sending admin alert email', err)
+		// Don't throw - we don't want alert failures to break the flow
+		return null
+	}
+}

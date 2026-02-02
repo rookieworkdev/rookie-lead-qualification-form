@@ -23,7 +23,12 @@ export const config = {
     apiKey: process.env.RESEND_API_KEY,
     fromEmail: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
   },
-  
+
+  // Admin alerts
+  adminAlert: {
+    email: process.env.ADMIN_ALERT_EMAIL,
+  },
+
   // Webhook security
   webhook: {
     secret: process.env.WEBHOOK_SECRET,

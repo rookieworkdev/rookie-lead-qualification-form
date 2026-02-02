@@ -67,9 +67,9 @@ export async function createSignal(companyId, payload) {
  * Inserts a spam lead into rejected_leads
  * Replicates "Insert Spam Lead" and "Insert Spam Lead - Fast Reject" nodes
  */
-export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)') {
+export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)', classification = 'likely_spam') {
   try {
-    logger.info('Inserting spam lead', { email: leadData.email });
+    logger.info('Inserting rejected lead', { email: leadData.email, classification });
 
     const { data, error } = await supabase
       .from('rejected_leads')
@@ -80,7 +80,7 @@ export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)'
         company_name: leadData.company_name,
         submitted_description: leadData.needs_description,
         source: 'website_form',
-        classification: 'likely_spam',
+        classification: classification,
         ai_reasoning: aiReasoning,
       })
       .select()
@@ -90,12 +90,12 @@ export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)'
       throw error;
     }
 
-    logger.info('Spam lead inserted', { leadId: data.id });
+    logger.info('Rejected lead inserted', { leadId: data.id, classification });
 
     return data;
   } catch (error) {
-    logger.error('Error inserting spam lead', error);
-    throw new Error(`Failed to insert spam lead: ${error.message}`);
+    logger.error('Error inserting rejected lead', error);
+    throw new Error(`Failed to insert rejected lead: ${error.message}`);
   }
 }
 
