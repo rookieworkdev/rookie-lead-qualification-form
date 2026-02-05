@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import { z } from 'zod';
 import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import type {
@@ -8,6 +9,25 @@ import type {
   NormalizedCompanyData,
   JobAdData,
 } from '../types/index.js';
+
+// Zod schemas for AI response validation
+const AIScoreResultSchema = z.object({
+  lead_score: z.number().min(1).max(100),
+  role_category: z.string(),
+  classification: z.enum(['valid_lead', 'invalid_lead', 'likely_candidate', 'likely_spam']),
+  key_requirements: z.array(z.string()),
+  ai_reasoning: z.string(),
+});
+
+const JobAdDataSchema = z.object({
+  title: z.string().min(1),
+  company: z.string().min(1),
+  description: z.string().min(1),
+  location: z.string().min(1),
+  category: z.string().min(1),
+  external_url: z.string().url(),
+  posted_date: z.string(),
+});
 
 const openai = new OpenAI({
   apiKey: config.openai.apiKey,
@@ -300,14 +320,23 @@ Provide your analysis in this exact JSON format:
       .replace(/\s*```\s*$/, '')
       .trim();
 
-    const parsed = JSON.parse(cleanContent) as AIScoreResult;
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = AIScoreResultSchema.safeParse(jsonParsed);
+
+    if (!validated.success) {
+      logger.error('AI scoring response validation failed', {
+        errors: validated.error.errors,
+        rawContent: cleanContent,
+      });
+      throw new Error(`Invalid AI response structure: ${validated.error.message}`);
+    }
 
     logger.info('Lead scoring complete', {
-      classification: parsed.classification,
-      score: parsed.lead_score,
+      classification: validated.data.classification,
+      score: validated.data.lead_score,
     });
 
-    return parsed;
+    return validated.data;
   } catch (error) {
     const err = error as Error;
     logger.error('Error scoring lead', error);
@@ -369,11 +398,20 @@ Return ONLY valid JSON in this format:
       .replace(/\s*```\s*$/, '')
       .trim();
 
-    const parsed = JSON.parse(cleanContent) as JobAdData;
+    const jsonParsed = JSON.parse(cleanContent);
+    const validated = JobAdDataSchema.safeParse(jsonParsed);
 
-    logger.info('Job ad generation complete', { title: parsed.title });
+    if (!validated.success) {
+      logger.error('Job ad response validation failed', {
+        errors: validated.error.errors,
+        rawContent: cleanContent,
+      });
+      throw new Error(`Invalid job ad response structure: ${validated.error.message}`);
+    }
 
-    return parsed;
+    logger.info('Job ad generation complete', { title: validated.data.title });
+
+    return validated.data;
   } catch (error) {
     const err = error as Error;
     logger.error('Error generating job ad', error);
