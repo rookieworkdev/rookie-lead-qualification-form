@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 import { config } from '../config/env.js';
-import { logger } from '../utils/logger.js';
+import { logger, getErrorMessage } from '../utils/logger.js';
 import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
 
 const resend = new Resend(config.resend.apiKey);
@@ -225,9 +225,8 @@ export async function sendEmailToLead(
 
     return data as EmailResponse;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error sending email via Resend', error);
-    throw new Error(`Failed to send email: ${err.message}`);
+    throw new Error(`Failed to send email: ${getErrorMessage(error)}`);
   }
 }
 
@@ -236,9 +235,10 @@ export async function sendEmailToLead(
  */
 function generateAdminAlertHTML(
   formData: FormData,
-  error: Error,
+  error: unknown,
   failurePoint: string
 ): string {
+  const errorMessage = getErrorMessage(error);
   return `<!DOCTYPE html>
 <html lang="sv">
 <head>
@@ -316,7 +316,7 @@ function generateAdminAlertHTML(
       <h2>Felinformation</h2>
       <div class="error-box">
         <p><strong>Fel vid:</strong> ${failurePoint}</p>
-        <p><strong>Felmeddelande:</strong> ${error.message || 'Unknown error'}</p>
+        <p><strong>Felmeddelande:</strong> ${errorMessage}</p>
         <p><strong>Tidpunkt:</strong> ${new Date().toLocaleString('sv-SE')}</p>
       </div>
     </div>
@@ -350,7 +350,7 @@ function generateAdminAlertHTML(
  */
 export async function sendAdminAlert(
   formData: FormData,
-  error: Error,
+  error: unknown,
   failurePoint: string = 'webhook_processing'
 ): Promise<EmailResponse | null> {
   try {

@@ -1,5 +1,5 @@
 import express, { Request, Response, Router } from 'express';
-import { logger } from '../utils/logger.js';
+import { logger, getErrorMessage } from '../utils/logger.js';
 import {
   validateLead,
   extractDomain,
@@ -215,7 +215,6 @@ router.post('/webhook', async (req: Request, res: Response) => {
       }
     }
   } catch (error) {
-    const err = error as Error;
     logger.error('Webhook processing failed', error, {
       body: req.body,
       processingTime: Date.now() - startTime,
@@ -224,7 +223,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
     // Save form data to rejected_leads so it's not lost
     if (formData) {
       try {
-        await insertRejectedLead(formData, 'processing_error', `Processing error: ${err.message}`);
+        await insertRejectedLead(formData, 'processing_error', `Processing error: ${getErrorMessage(error)}`);
         logger.info('Form data saved to rejected_leads after processing failure');
       } catch (saveError) {
         logger.error('Failed to save form data after error', saveError);
@@ -233,7 +232,7 @@ router.post('/webhook', async (req: Request, res: Response) => {
 
       // Send admin alert email with form data and error details
       try {
-        await sendAdminAlert(formData, err, 'webhook_processing');
+        await sendAdminAlert(formData, error, 'webhook_processing');
       } catch (alertError) {
         logger.error('Failed to send admin alert', alertError);
         // Continue anyway - data is already saved

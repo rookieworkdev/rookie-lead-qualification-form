@@ -9,6 +9,20 @@ interface LogEntry {
   [key: string]: unknown;
 }
 
+/**
+ * Type-safe error message extraction
+ * Handles unknown catch block errors properly
+ */
+export function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  return 'Unknown error';
+}
+
 export const logger = {
   info: (message: string, meta: LogMeta = {}): void => {
     const entry: LogEntry = {
@@ -20,13 +34,12 @@ export const logger = {
     console.log(JSON.stringify(entry));
   },
 
-  error: (message: string, error?: Error | unknown, meta: LogMeta = {}): void => {
-    const err = error as Error | undefined;
+  error: (message: string, error?: unknown, meta: LogMeta = {}): void => {
     const entry: LogEntry = {
       level: 'error',
       message,
-      error: err?.message ?? String(error),
-      stack: err?.stack,
+      error: getErrorMessage(error),
+      stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString(),
       ...meta,
     };

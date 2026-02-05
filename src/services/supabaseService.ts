@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config/env.js';
-import { logger } from '../utils/logger.js';
+import { logger, getErrorMessage } from '../utils/logger.js';
 import type {
   FormData,
   AIScoreResult,
@@ -41,9 +41,8 @@ export async function findOrCreateCompany(
 
     return data as string; // Returns the company_id
   } catch (error) {
-    const err = error as Error;
     logger.error('Error finding/creating company', error);
-    throw new Error(`Failed to find/create company: ${err.message}`);
+    throw new Error(`Failed to find/create company: ${getErrorMessage(error)}`);
   }
 }
 
@@ -77,9 +76,8 @@ export async function createSignal(
 
     return data as SignalRecord;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error creating signal', error);
-    throw new Error(`Failed to create signal: ${err.message}`);
+    throw new Error(`Failed to create signal: ${getErrorMessage(error)}`);
   }
 }
 
@@ -118,9 +116,8 @@ export async function insertRejectedLead(
 
     return data as RejectedLeadRecord;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error inserting rejected lead', error);
-    throw new Error(`Failed to insert rejected lead: ${err.message}`);
+    throw new Error(`Failed to insert rejected lead: ${getErrorMessage(error)}`);
   }
 }
 
@@ -156,9 +153,8 @@ export async function insertCandidateLead(
 
     return data as CandidateLeadRecord;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error inserting candidate lead', error);
-    throw new Error(`Failed to insert candidate lead: ${err.message}`);
+    throw new Error(`Failed to insert candidate lead: ${getErrorMessage(error)}`);
   }
 }
 
@@ -188,9 +184,8 @@ export async function upsertContact(contactData: ContactData): Promise<ContactRe
 
     return data as ContactRecord;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error upserting contact', error);
-    throw new Error(`Failed to upsert contact: ${err.message}`);
+    throw new Error(`Failed to upsert contact: ${getErrorMessage(error)}`);
   }
 }
 
@@ -241,8 +236,7 @@ export async function createJobAdRecord(
 
     return data as JobAdRecord;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error creating job ad record', error);
-    throw new Error(`Failed to create job ad record: ${err.message}`);
+    throw new Error(`Failed to create job ad record: ${getErrorMessage(error)}`);
   }
 }

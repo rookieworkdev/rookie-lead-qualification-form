@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import { z } from 'zod';
 import { config } from '../config/env.js';
-import { logger } from '../utils/logger.js';
+import { logger, getErrorMessage } from '../utils/logger.js';
 import type {
   FormData,
   ValidatedLead,
@@ -338,9 +338,8 @@ Provide your analysis in this exact JSON format:
 
     return validated.data;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error scoring lead', error);
-    throw new Error(`AI scoring failed: ${err.message}`);
+    throw new Error(`AI scoring failed: ${getErrorMessage(error)}`);
   }
 }
 
@@ -413,8 +412,7 @@ Return ONLY valid JSON in this format:
 
     return validated.data;
   } catch (error) {
-    const err = error as Error;
     logger.error('Error generating job ad', error);
-    throw new Error(`Job ad generation failed: ${err.message}`);
+    throw new Error(`Job ad generation failed: ${getErrorMessage(error)}`);
   }
 }
