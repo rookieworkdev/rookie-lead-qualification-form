@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
@@ -6,16 +6,22 @@ import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
 import webhookRouter from './routes/webhook.js';
 
+interface ErrorWithStatus extends Error {
+  status?: number;
+}
+
 const app = express();
 
 // Security middleware
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',') || '*',
+    credentials: true,
+  })
+);
 
 // Rate limiting - 100 requests per 15 minutes per IP
 const limiter = rateLimit({
@@ -33,9 +39,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging middleware
-app.use((req, res, next) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const start = Date.now();
-  
+
   res.on('finish', () => {
     const duration = Date.now() - start;
     logger.info('Request processed', {
@@ -46,7 +52,7 @@ app.use((req, res, next) => {
       ip: req.ip,
     });
   });
-  
+
   next();
 });
 
@@ -54,7 +60,7 @@ app.use((req, res, next) => {
 app.use('/api', webhookRouter);
 
 // Root endpoint
-app.get('/', (req, res) => {
+app.get('/', (_req: Request, res: Response) => {
   res.json({
     service: 'Rookie Recruitment Webhook',
     version: '1.0.0',
@@ -67,7 +73,7 @@ app.get('/', (req, res) => {
 });
 
 // 404 handler
-app.use((req, res) => {
+app.use((req: Request, res: Response) => {
   res.status(404).json({
     error: 'Not Found',
     message: `Route ${req.method} ${req.path} not found`,
@@ -75,7 +81,7 @@ app.use((req, res) => {
 });
 
 // Global error handler
-app.use((err, req, res, next) => {
+app.use((err: ErrorWithStatus, req: Request, res: Response, _next: NextFunction) => {
   logger.error('Unhandled error', err, {
     method: req.method,
     path: req.path,

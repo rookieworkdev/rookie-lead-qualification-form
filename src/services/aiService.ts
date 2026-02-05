@@ -1,10 +1,17 @@
-import OpenAI from 'openai'
-import { config } from '../config/env.js'
-import { logger } from '../utils/logger.js'
+import OpenAI from 'openai';
+import { config } from '../config/env.js';
+import { logger } from '../utils/logger.js';
+import type {
+  FormData,
+  ValidatedLead,
+  AIScoreResult,
+  NormalizedCompanyData,
+  JobAdData,
+} from '../types/index.js';
 
 const openai = new OpenAI({
-	apiKey: config.openai.apiKey,
-})
+  apiKey: config.openai.apiKey,
+});
 
 /**
  * System prompt for the Scoring AI Agent
@@ -195,7 +202,7 @@ E-post*: john567@gmail.com
 Telefon:
 Beskriv ditt personalbehov:
 Win money fast! Visit www.get-rich-quick.biz to claim your prize.
-`
+`;
 
 /**
  * System prompt for Job Ad Generation
@@ -208,7 +215,7 @@ Business Analyst
 About the role
 
 As a Business Analyst at Autoliv, you will collaborate closely with the CEO and the Executive Management Team on both operational initiatives and strategically significant projects. This role presents an exciting opportunity for recent graduates to kick-start their careers, grow professionally within Autoliv, and build a strong foundation for long-term success.
- 
+
 About the company
 
 Autoliv is the worldwide leader in automotive safety systems. Through our group companies, we develop, manufacture and market protective systems, such as airbags, seatbelts, and steering wheels for all major automotive manufacturers in the world as well as mobility safety solutions.
@@ -216,7 +223,7 @@ Autoliv is the worldwide leader in automotive safety systems. Through our group 
 At Autoliv, we challenge and redefine the standards of mobility safety to sustainably deliver leading solutions. In 2024, our products saved 37,000 lives and reduced 600,000 injuries.
 
 Our ~65,000 colleagues in 25 countries are passionate about our vision of Saving More Lives and quality is at the heart of everything we do. We drive innovation, research, and development at our 13 technical centers, with their 20 test tracks.
- 
+
 Key responsibilities
 
 The job involves operational as well as strategic elements that can be summarized, but not limited, to the following areas:
@@ -227,7 +234,7 @@ Be a participant in EMT meetings
 
 
 Participate in, or lead global projects driven by priorities set by the EMT and/or the CEO office team.
- 
+
 Your background
 
 Degree in M.S. in Business Administration or Engineering with a distinguished academic record is a must
@@ -238,20 +245,20 @@ Experience of project management
 Excellent communication skills
 High analytical and problem-solving skills
 Excellent reading and writing English and Swedish skills
- 
+
 Questions and application
 
 In this recruitment, Autoliv is collaborating with Rookie. Apply for the job by submitting your CV and cover letter. If you have any questions, please contact the responsible recruiter, Håkan Olsson at hakan.olsson@rookiework.se or 072 55 55 712.
 
-Please submit your application as soon as possible.`
+Please submit your application as soon as possible.`;
 
 /**
  * Scores a lead using OpenAI
  * Replicates the "Scoring AI Agent" node in original n8n flow
  */
-export async function scoreLead(leadData) {
-	try {
-		const userPrompt = `Analyze this lead submission:
+export async function scoreLead(leadData: ValidatedLead | FormData): Promise<AIScoreResult> {
+  try {
+    const userPrompt = `Analyze this lead submission:
 
 Company Name: ${leadData.company_name}
 Contact Name: ${leadData.full_name}
@@ -268,50 +275,58 @@ Provide your analysis in this exact JSON format:
 "classification": "valid_lead | invalid_lead | likely_candidate | likely_spam",
 "key_requirements": ["requirement1", "requirement2"],
 "ai_reasoning": "<short explanation of why this classification and score were assigned>"
-}`
+}`;
 
-		logger.info('Calling OpenAI for lead scoring')
+    logger.info('Calling OpenAI for lead scoring');
 
-		const response = await openai.chat.completions.create({
-			model: config.openai.model,
-			messages: [
-				{ role: 'system', content: SCORING_SYSTEM_PROMPT },
-				{ role: 'user', content: userPrompt },
-			],
-			temperature: config.openai.temperature,
-		})
+    const response = await openai.chat.completions.create({
+      model: config.openai.model,
+      messages: [
+        { role: 'system', content: SCORING_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: config.openai.temperature,
+    });
 
-		const content = response.choices[0].message.content
+    const content = response.choices[0].message.content;
 
-		// Parse the response (remove markdown code blocks if present)
-		const cleanContent = content
-			.replace(/^```json\s*/i, '')
-			.replace(/\s*```\s*$/, '')
-			.trim()
+    if (!content) {
+      throw new Error('No content in OpenAI response');
+    }
 
-		const parsed = JSON.parse(cleanContent)
+    // Parse the response (remove markdown code blocks if present)
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
 
-		logger.info('Lead scoring complete', {
-			classification: parsed.classification,
-			score: parsed.lead_score,
-		})
+    const parsed = JSON.parse(cleanContent) as AIScoreResult;
 
-		return parsed
-	} catch (error) {
-		logger.error('Error scoring lead', error)
-		throw new Error(`AI scoring failed: ${error.message}`)
-	}
+    logger.info('Lead scoring complete', {
+      classification: parsed.classification,
+      score: parsed.lead_score,
+    });
+
+    return parsed;
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Error scoring lead', error);
+    throw new Error(`AI scoring failed: ${err.message}`);
+  }
 }
 
 /**
  * Generates a job ad draft using OpenAI
  * Replicates the "Generate Job Ad Draft" node in original n8n flow
  */
-export async function generateJobAd(leadData, normalizedData) {
-	try {
-		const today = new Date().toISOString().split('T')[0]
+export async function generateJobAd(
+  leadData: FormData,
+  normalizedData: NormalizedCompanyData
+): Promise<JobAdData> {
+  try {
+    const today = new Date().toISOString().split('T')[0];
 
-		const userPrompt = `Generate a professional Swedish job ad based on this form submission:
+    const userPrompt = `Generate a professional Swedish job ad based on this form submission:
 
 Company: ${leadData.company_name}
 Industry: ${leadData.industry}
@@ -329,34 +344,39 @@ Return ONLY valid JSON in this format:
   "category": "${normalizedData.role_category}",
   "external_url": "https://rookiework.se/jobs/[generate-slug-from-title]",
   "posted_date": "${today}"
-}`
+}`;
 
-		logger.info('Calling OpenAI for job ad generation')
+    logger.info('Calling OpenAI for job ad generation');
 
-		const response = await openai.chat.completions.create({
-			model: config.openai.model,
-			messages: [
-				{ role: 'system', content: JOB_AD_SYSTEM_PROMPT },
-				{ role: 'user', content: userPrompt },
-			],
-			temperature: config.openai.temperature,
-		})
+    const response = await openai.chat.completions.create({
+      model: config.openai.model,
+      messages: [
+        { role: 'system', content: JOB_AD_SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: config.openai.temperature,
+    });
 
-		const content = response.choices[0].message.content
+    const content = response.choices[0].message.content;
 
-		// Parse the response
-		const cleanContent = content
-			.replace(/^```json\s*/i, '')
-			.replace(/\s*```\s*$/, '')
-			.trim()
+    if (!content) {
+      throw new Error('No content in OpenAI response');
+    }
 
-		const parsed = JSON.parse(cleanContent)
+    // Parse the response
+    const cleanContent = content
+      .replace(/^```json\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
 
-		logger.info('Job ad generation complete', { title: parsed.title })
+    const parsed = JSON.parse(cleanContent) as JobAdData;
 
-		return parsed
-	} catch (error) {
-		logger.error('Error generating job ad', error)
-		throw new Error(`Job ad generation failed: ${error.message}`)
-	}
+    logger.info('Job ad generation complete', { title: parsed.title });
+
+    return parsed;
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Error generating job ad', error);
+    throw new Error(`Job ad generation failed: ${err.message}`);
+  }
 }

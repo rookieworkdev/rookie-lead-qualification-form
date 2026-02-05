@@ -1,14 +1,15 @@
-import { Resend } from 'resend'
-import { config } from '../config/env.js'
-import { logger } from '../utils/logger.js'
+import { Resend } from 'resend';
+import { config } from '../config/env.js';
+import { logger } from '../utils/logger.js';
+import type { FormData, JobAdData, EmailResponse } from '../types/index.js';
 
-const resend = new Resend(config.resend.apiKey)
+const resend = new Resend(config.resend.apiKey);
 
 /**
  * Generates the HTML email template
  */
-function generateEmailHTML(jobAd) {
-	return `<!DOCTYPE html>
+function generateEmailHTML(jobAd: JobAdData): string {
+  return `<!DOCTYPE html>
 <html lang="sv">
 <head>
   <meta charset="UTF-8" />
@@ -191,46 +192,54 @@ function generateEmailHTML(jobAd) {
     </div>
   </div>
 </body>
-</html>`
+</html>`;
 }
 
 /**
  * Sends the confirmation email to the lead using Resend
  */
-export async function sendEmailToLead(leadEmail, jobAd) {
-	try {
-		logger.info('Sending email to lead via Resend', { email: leadEmail })
+export async function sendEmailToLead(
+  leadEmail: string,
+  jobAd: JobAdData
+): Promise<EmailResponse> {
+  try {
+    logger.info('Sending email to lead via Resend', { email: leadEmail });
 
-		// For testing without verified domain, send to Rookie account only
-		// Original lead email included in subject for tracking
-		const { data, error } = await resend.emails.send({
-			from: config.resend.fromEmail,
-			to: 'rookiework.dev@gmail.com',
-			subject: `Tack för din förfrågan till Rookie - Vi har kandidater! [Lead: ${leadEmail}]`,
-			html: generateEmailHTML(jobAd),
-		})
+    // For testing without verified domain, send to Rookie account only
+    // Original lead email included in subject for tracking
+    const { data, error } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: 'rookiework.dev@gmail.com',
+      subject: `Tack för din förfrågan till Rookie - Vi har kandidater! [Lead: ${leadEmail}]`,
+      html: generateEmailHTML(jobAd),
+    });
 
-		if (error) {
-			throw error
-		}
+    if (error) {
+      throw error;
+    }
 
-		logger.info('Email sent successfully via Resend', {
-			emailId: data.id,
-			to: leadEmail,
-		})
+    logger.info('Email sent successfully via Resend', {
+      emailId: data?.id,
+      to: leadEmail,
+    });
 
-		return data
-	} catch (error) {
-		logger.error('Error sending email via Resend', error)
-		throw new Error(`Failed to send email: ${error.message}`)
-	}
+    return data as EmailResponse;
+  } catch (error) {
+    const err = error as Error;
+    logger.error('Error sending email via Resend', error);
+    throw new Error(`Failed to send email: ${err.message}`);
+  }
 }
 
 /**
  * Generates admin alert email HTML
  */
-function generateAdminAlertHTML(formData, error, failurePoint) {
-	return `<!DOCTYPE html>
+function generateAdminAlertHTML(
+  formData: FormData,
+  error: Error,
+  failurePoint: string
+): string {
+  return `<!DOCTYPE html>
 <html lang="sv">
 <head>
   <meta charset="UTF-8" />
@@ -333,46 +342,50 @@ function generateAdminAlertHTML(formData, error, failurePoint) {
     </div>
   </div>
 </body>
-</html>`
+</html>`;
 }
 
 /**
  * Sends an alert email to admin when form processing fails
  */
-export async function sendAdminAlert(formData, error, failurePoint = 'webhook_processing') {
-	try {
-		// Check if admin alerts are configured
-		if (!config.adminAlert?.email) {
-			logger.warn('Admin alert email not configured, skipping alert')
-			return null
-		}
+export async function sendAdminAlert(
+  formData: FormData,
+  error: Error,
+  failurePoint: string = 'webhook_processing'
+): Promise<EmailResponse | null> {
+  try {
+    // Check if admin alerts are configured
+    if (!config.adminAlert?.email) {
+      logger.warn('Admin alert email not configured, skipping alert');
+      return null;
+    }
 
-		logger.info('Sending admin alert email', {
-			email: config.adminAlert.email,
-			failurePoint,
-		})
+    logger.info('Sending admin alert email', {
+      email: config.adminAlert.email,
+      failurePoint,
+    });
 
-		const { data, error: emailError } = await resend.emails.send({
-			from: config.resend.fromEmail,
-			to: config.adminAlert.email,
-			subject: `🚨 Form Submission Failed - ${formData.company_name || 'Unknown Company'}`,
-			html: generateAdminAlertHTML(formData, error, failurePoint),
-		})
+    const { data, error: emailError } = await resend.emails.send({
+      from: config.resend.fromEmail,
+      to: config.adminAlert.email,
+      subject: `🚨 Form Submission Failed - ${formData.company_name || 'Unknown Company'}`,
+      html: generateAdminAlertHTML(formData, error, failurePoint),
+    });
 
-		if (emailError) {
-			logger.error('Failed to send admin alert email', emailError)
-			// Don't throw - we don't want alert failures to break the flow
-			return null
-		}
+    if (emailError) {
+      logger.error('Failed to send admin alert email', emailError);
+      // Don't throw - we don't want alert failures to break the flow
+      return null;
+    }
 
-		logger.info('Admin alert email sent successfully', {
-			emailId: data.id,
-		})
+    logger.info('Admin alert email sent successfully', {
+      emailId: data?.id,
+    });
 
-		return data
-	} catch (err) {
-		logger.error('Error sending admin alert email', err)
-		// Don't throw - we don't want alert failures to break the flow
-		return null
-	}
+    return data as EmailResponse;
+  } catch (err) {
+    logger.error('Error sending admin alert email', err);
+    // Don't throw - we don't want alert failures to break the flow
+    return null;
+  }
 }

@@ -1,14 +1,29 @@
 import { createClient } from '@supabase/supabase-js';
 import { config } from '../config/env.js';
 import { logger } from '../utils/logger.js';
+import type {
+  FormData,
+  AIScoreResult,
+  ContactData,
+  JobAdWithCompanyId,
+  SignalRecord,
+  RejectedLeadRecord,
+  CandidateLeadRecord,
+  ContactRecord,
+  JobAdRecord,
+} from '../types/index.js';
 
-const supabase = createClient(config.supabase.url, config.supabase.key);
+const supabase = createClient(config.supabase.url, config.supabase.key || '');
 
 /**
  * Calls the find_or_create_company stored procedure
  * Replicates the "Find or Create Company in Supabase" HTTP node
  */
-export async function findOrCreateCompany(companyName, domain, source = 'website_form') {
+export async function findOrCreateCompany(
+  companyName: string,
+  domain: string | null,
+  source: string = 'website_form'
+): Promise<string> {
   try {
     logger.info('Finding or creating company', { companyName, domain });
 
@@ -24,10 +39,11 @@ export async function findOrCreateCompany(companyName, domain, source = 'website
 
     logger.info('Company found/created', { company_id: data });
 
-    return data; // Returns the company_id
+    return data as string; // Returns the company_id
   } catch (error) {
+    const err = error as Error;
     logger.error('Error finding/creating company', error);
-    throw new Error(`Failed to find/create company: ${error.message}`);
+    throw new Error(`Failed to find/create company: ${err.message}`);
   }
 }
 
@@ -35,7 +51,10 @@ export async function findOrCreateCompany(companyName, domain, source = 'website
  * Creates a signal record in the signals table
  * Replicates the "Create Signal for Form Submission" node
  */
-export async function createSignal(companyId, payload) {
+export async function createSignal(
+  companyId: string,
+  payload: Record<string, unknown>
+): Promise<SignalRecord> {
   try {
     logger.info('Creating signal', { companyId });
 
@@ -56,10 +75,11 @@ export async function createSignal(companyId, payload) {
 
     logger.info('Signal created', { signalId: data.id });
 
-    return data;
+    return data as SignalRecord;
   } catch (error) {
+    const err = error as Error;
     logger.error('Error creating signal', error);
-    throw new Error(`Failed to create signal: ${error.message}`);
+    throw new Error(`Failed to create signal: ${err.message}`);
   }
 }
 
@@ -67,7 +87,11 @@ export async function createSignal(companyId, payload) {
  * Inserts a spam lead into rejected_leads
  * Replicates "Insert Spam Lead" and "Insert Spam Lead - Fast Reject" nodes
  */
-export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)', classification = 'likely_spam') {
+export async function insertSpamLead(
+  leadData: FormData,
+  aiReasoning: string = 'N/A (Fast Reject)',
+  classification: string = 'likely_spam'
+): Promise<RejectedLeadRecord> {
   try {
     logger.info('Inserting rejected lead', { email: leadData.email, classification });
 
@@ -92,10 +116,11 @@ export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)'
 
     logger.info('Rejected lead inserted', { leadId: data.id, classification });
 
-    return data;
+    return data as RejectedLeadRecord;
   } catch (error) {
+    const err = error as Error;
     logger.error('Error inserting rejected lead', error);
-    throw new Error(`Failed to insert rejected lead: ${error.message}`);
+    throw new Error(`Failed to insert rejected lead: ${err.message}`);
   }
 }
 
@@ -103,7 +128,10 @@ export async function insertSpamLead(leadData, aiReasoning = 'N/A (Fast Reject)'
  * Inserts an invalid lead into rejected_leads
  * Replicates "Insert Invalid Lead" node
  */
-export async function insertInvalidLead(leadData, aiData) {
+export async function insertInvalidLead(
+  leadData: FormData,
+  aiData: AIScoreResult
+): Promise<RejectedLeadRecord> {
   try {
     logger.info('Inserting invalid lead', { email: leadData.email });
 
@@ -128,10 +156,11 @@ export async function insertInvalidLead(leadData, aiData) {
 
     logger.info('Invalid lead inserted', { leadId: data.id });
 
-    return data;
+    return data as RejectedLeadRecord;
   } catch (error) {
+    const err = error as Error;
     logger.error('Error inserting invalid lead', error);
-    throw new Error(`Failed to insert invalid lead: ${error.message}`);
+    throw new Error(`Failed to insert invalid lead: ${err.message}`);
   }
 }
 
@@ -139,7 +168,10 @@ export async function insertInvalidLead(leadData, aiData) {
  * Inserts a candidate lead into candidate_leads
  * Replicates "Insert Candidate Lead" node
  */
-export async function insertCandidateLead(leadData, aiData) {
+export async function insertCandidateLead(
+  leadData: FormData,
+  aiData: AIScoreResult
+): Promise<CandidateLeadRecord> {
   try {
     logger.info('Inserting candidate lead', { email: leadData.email });
 
@@ -162,10 +194,11 @@ export async function insertCandidateLead(leadData, aiData) {
 
     logger.info('Candidate lead inserted', { leadId: data.id });
 
-    return data;
+    return data as CandidateLeadRecord;
   } catch (error) {
+    const err = error as Error;
     logger.error('Error inserting candidate lead', error);
-    throw new Error(`Failed to insert candidate lead: ${error.message}`);
+    throw new Error(`Failed to insert candidate lead: ${err.message}`);
   }
 }
 
@@ -174,7 +207,7 @@ export async function insertCandidateLead(leadData, aiData) {
  * Replicates "Upsert Contacts with Email" HTTP node
  * Uses on_conflict=company_id,email with merge-duplicates
  */
-export async function upsertContact(contactData) {
+export async function upsertContact(contactData: ContactData): Promise<ContactRecord> {
   try {
     logger.info('Upserting contact', { email: contactData.email });
 
@@ -193,10 +226,11 @@ export async function upsertContact(contactData) {
 
     logger.info('Contact upserted', { contactId: data.id });
 
-    return data;
+    return data as ContactRecord;
   } catch (error) {
+    const err = error as Error;
     logger.error('Error upserting contact', error);
-    throw new Error(`Failed to upsert contact: ${error.message}`);
+    throw new Error(`Failed to upsert contact: ${err.message}`);
   }
 }
 
@@ -204,7 +238,11 @@ export async function upsertContact(contactData) {
  * Creates a job ad record in website_jobs
  * Replicates "Create Job Ad Record" node
  */
-export async function createJobAdRecord(jobAdData, formData, aiData) {
+export async function createJobAdRecord(
+  jobAdData: JobAdWithCompanyId,
+  formData: FormData,
+  aiData: AIScoreResult
+): Promise<JobAdRecord> {
   try {
     logger.info('Creating job ad record', { title: jobAdData.title });
 
@@ -241,9 +279,10 @@ export async function createJobAdRecord(jobAdData, formData, aiData) {
 
     logger.info('Job ad record created', { jobId: data.id });
 
-    return data;
+    return data as JobAdRecord;
   } catch (error) {
+    const err = error as Error;
     logger.error('Error creating job ad record', error);
-    throw new Error(`Failed to create job ad record: ${error.message}`);
+    throw new Error(`Failed to create job ad record: ${err.message}`);
   }
 }

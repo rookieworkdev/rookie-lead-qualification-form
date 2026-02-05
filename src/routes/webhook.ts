@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { logger } from '../utils/logger.js';
 import {
   validateLead,
@@ -17,6 +17,12 @@ import {
   createJobAdRecord,
 } from '../services/supabaseService.js';
 import { sendEmailToLead, sendAdminAlert } from '../services/emailService.js';
+import type {
+  WebhookRequestBody,
+  FormData,
+  WebhookSuccessResponse,
+  JobAdWithCompanyId,
+} from '../types/index.js';
 
 const router = express.Router();
 
@@ -24,11 +30,11 @@ const router = express.Router();
  * Main webhook handler
  * Replicates the entire N8n flow
  */
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', async (req: Request<object, object, WebhookRequestBody>, res: Response) => {
   const startTime = Date.now();
 
   // Declare formData outside try block so it's accessible in catch
-  let formData;
+  let formData: FormData | undefined;
 
   try {
     logger.info('Webhook received', { body: req.body });
@@ -63,12 +69,14 @@ router.post('/webhook', async (req, res) => {
 
       await insertSpamLead(validatedData);
 
-      return res.status(200).json({
+      const response: WebhookSuccessResponse = {
         success: true,
         message: 'Lead received but classified as spam (fast reject)',
         classification: 'spam',
         processingTime: Date.now() - startTime,
-      });
+      };
+
+      return res.status(200).json(response);
     }
 
     // Step 4: Scoring AI Agent - Get AI classification
@@ -80,7 +88,7 @@ router.post('/webhook', async (req, res) => {
     logger.info('Classification determined', { classification });
 
     switch (classification) {
-      case 'valid_lead':
+      case 'valid_lead': {
         // Valid lead path - Continue to contact creation and job ad generation
         logger.info('Processing valid lead');
 
@@ -89,7 +97,7 @@ router.post('/webhook', async (req, res) => {
 
         // Step 7: Find or Create Company
         const companyId = await findOrCreateCompany(
-          dataWithDomain.company_name,
+          dataWithDomain.company_name || '',
           dataWithDomain.extracted_domain
         );
 
@@ -116,101 +124,119 @@ router.post('/webhook', async (req, res) => {
         const jobAd = await generateJobAd(formData, normalizedData);
 
         // Add company_id to job ad data
-        const jobAdWithCompanyId = { ...jobAd, company_id: companyId };
+        const jobAdWithCompanyId: JobAdWithCompanyId = { ...jobAd, company_id: companyId };
 
         // Step 13: Create Job Ad Record
         await createJobAdRecord(jobAdWithCompanyId, formData, aiScore);
 
         // Step 14: Send Email to Lead
-        await sendEmailToLead(formData.email, jobAd);
+        await sendEmailToLead(formData.email || '', jobAd);
 
-        return res.status(200).json({
+        const response: WebhookSuccessResponse = {
           success: true,
           message: 'Valid lead processed successfully',
           classification: 'valid_lead',
           lead_score: normalizedData.lead_score,
           job_ad_title: jobAd.title,
           processingTime: Date.now() - startTime,
-        });
+        };
 
-      case 'invalid_lead':
+        return res.status(200).json(response);
+      }
+
+      case 'invalid_lead': {
         // Invalid lead path
         logger.info('Processing invalid lead');
         await insertInvalidLead(formData, aiScore);
 
-        return res.status(200).json({
+        const response: WebhookSuccessResponse = {
           success: true,
           message: 'Lead classified as invalid',
           classification: 'invalid_lead',
           reason: aiScore.ai_reasoning,
           processingTime: Date.now() - startTime,
-        });
+        };
 
-      case 'likely_candidate':
+        return res.status(200).json(response);
+      }
+
+      case 'likely_candidate': {
         // Candidate path
         logger.info('Processing likely candidate');
         await insertCandidateLead(formData, aiScore);
 
-        return res.status(200).json({
+        const response: WebhookSuccessResponse = {
           success: true,
           message: 'Lead classified as job seeker',
           classification: 'likely_candidate',
           processingTime: Date.now() - startTime,
-        });
+        };
 
-      case 'likely_spam':
+        return res.status(200).json(response);
+      }
+
+      case 'likely_spam': {
         // Spam path (from AI classification)
         logger.info('Processing likely spam (AI classified)');
         await insertSpamLead(formData, aiScore.ai_reasoning);
 
-        return res.status(200).json({
+        const response: WebhookSuccessResponse = {
           success: true,
           message: 'Lead classified as spam',
           classification: 'likely_spam',
           processingTime: Date.now() - startTime,
-        });
+        };
 
-      default:
+        return res.status(200).json(response);
+      }
+
+      default: {
         logger.error('Unknown classification', { classification });
         throw new Error(`Unknown classification: ${classification}`);
+      }
     }
   } catch (error) {
+    const err = error as Error;
     logger.error('Webhook processing failed', error, {
       body: req.body,
       processingTime: Date.now() - startTime,
     });
 
     // Save form data to rejected_leads so it's not lost
-    try {
-      await insertSpamLead(formData, `Processing error: ${error.message}`, 'processing_error');
-      logger.info('Form data saved to rejected_leads after processing failure');
-    } catch (saveError) {
-      logger.error('Failed to save form data after error', saveError);
-      // Continue anyway - we'll still send the alert
-    }
+    if (formData) {
+      try {
+        await insertSpamLead(formData, `Processing error: ${err.message}`, 'processing_error');
+        logger.info('Form data saved to rejected_leads after processing failure');
+      } catch (saveError) {
+        logger.error('Failed to save form data after error', saveError);
+        // Continue anyway - we'll still send the alert
+      }
 
-    // Send admin alert email with form data and error details
-    try {
-      await sendAdminAlert(formData, error, 'webhook_processing');
-    } catch (alertError) {
-      logger.error('Failed to send admin alert', alertError);
-      // Continue anyway - data is already saved
+      // Send admin alert email with form data and error details
+      try {
+        await sendAdminAlert(formData, err, 'webhook_processing');
+      } catch (alertError) {
+        logger.error('Failed to send admin alert', alertError);
+        // Continue anyway - data is already saved
+      }
     }
 
     // Return 200 (not 500) - user doesn't need to know about internal errors
     // Their data has been saved and admin has been notified
-    return res.status(200).json({
+    const response: WebhookSuccessResponse = {
       success: true,
       message: 'Submission received and will be processed',
       processingTime: Date.now() - startTime,
-    });
+    };
+
+    return res.status(200).json(response);
   }
 });
 
 /**
  * Health check endpoint
  */
-router.get('/health', (req, res) => {
+router.get('/health', (_req: Request, res: Response) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
