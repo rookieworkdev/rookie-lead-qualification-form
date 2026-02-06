@@ -1,53 +1,43 @@
 # Job Scraper Integration Tasks
 
-## Completed - Indeed Job Scraper
+## Completed
 
-- [x] Types & schemas (`src/types/scraper.types.ts`, `src/schemas/scraper.ts`)
-- [x] Config (`src/config/env.ts`, `src/config/scrapers/jobs/indeed.config.ts`)
-- [x] AI prompt (`src/prompts/jobEvaluation.prompt.ts`)
-- [x] Indeed scraper (`src/services/jobs/indeedJobScraper.ts`)
-- [x] Job processor (`src/services/jobs/jobProcessor.ts`)
-- [x] Supabase operations (extended `src/services/supabaseService.ts`)
-- [x] AI evaluation (extended `src/services/aiService.ts`)
-- [x] API route (`src/routes/jobScraping.ts`)
-- [x] Email digest (extended `src/services/emailService.ts`)
+- [x] Indeed job scraper (types, config, AI prompt, scraper, processor, Supabase, routes, email digest)
+- [x] GitHub Actions cron workflow
+- [x] Fix Zod schema validation for Apify responses
+- [x] Fix Supabase insert (remove non-existent `url` column)
+- [x] Merge to main
 
-## Pending - Future Scrapers
+## Database Changes (use Supabase MCP)
 
-- [ ] LinkedIn job scraper (`src/services/jobs/linkedinJobScraper.ts`)
-- [ ] Arbetsformedlingen job scraper (`src/services/jobs/afJobScraper.ts`)
-- [ ] Google Maps lead scraper (`src/services/leads/googleMapsLeadScraper.ts`)
+- [ ] Rename `company_description` → use `description` column only, then delete `company_description`
+- [ ] Rename `job_ads` table → `jobs`
+- [ ] Rename `job_ads_stats` table → `job_stats`
+- [ ] Update all code references after table renames
+- [ ] Remove `website_jobs` and `website_contacts` tables (after all tests pass)
 
-## Pending - Infrastructure
+## Code Quality & Testing
 
-- [x] GitHub Actions cron workflow (`.github/workflows/job-scraper-cron.yml`)
+- [ ] Run all tests locally and live
+- [ ] Add tests to `/tests` folder if needed
+- [ ] Check Checklist for coding (reminder)
+- [ ] Investigate `apify-client` --legacy-peer-deps issue (future compatibility?)
+
+## Scraper Configuration
+
+- [ ] Figure out keywords/exclusion_keywords input for different Apify scrapers
+- [ ] Check/remove temporary item count filters from n8n flows
+- [ ] Decide on fetch frequency (cron) and maxItems per scraper
+
+## Future Scrapers
+
+- [ ] LinkedIn job scraper (reuse Indeed patterns where applicable)
+- [ ] Arbetsformedlingen job scraper
+- [ ] Google Maps lead scraper
+
+Note: Reuse logic from Indeed flow (system prompt, processor, etc.) but be careful not to over-merge - scrapers have different requirements.
+
+## Deployment
+
 - [ ] Add environment variables to deployment
-- [ ] Add GitHub Secrets (see below)
-
-## Environment Variables Required
-
-Add to your deployment environment (e.g., Render, Railway, Fly.io):
-
-```
-OPENROUTER_API_KEY=     # For AI job evaluation
-APIFY_API_KEY=          # For Apify scrapers
-SCRAPER_API_KEY=        # For API authentication (generate with: openssl rand -hex 32)
-SCRAPER_KEYWORDS=       # Optional: override default keywords
-SCRAPER_EXCLUSION_KEYWORDS=  # Optional: comma-separated
-JOB_RETENTION_DAYS=20   # Optional: defaults to 20
-```
-
-## GitHub Secrets Required
-
-Add to your GitHub repo → Settings → Secrets and variables → Actions:
-
-| Secret Name | Value |
-|-------------|-------|
-| `API_BASE_URL` | Your deployed API URL (e.g., `https://rookie-api.onrender.com`) |
-| `SCRAPER_API_KEY` | Same value as your deployment's SCRAPER_API_KEY |
-
-## API Endpoints
-
-- `POST /api/scraping/jobs/indeed` - Run Indeed scraper
-- `POST /api/scraping/jobs/cleanup` - Clean up old jobs
-- `GET /api/scraping/jobs/health` - Health check
+- [ ] Add GitHub Secrets (`API_BASE_URL`, `SCRAPER_API_KEY`)
