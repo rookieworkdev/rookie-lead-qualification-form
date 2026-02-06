@@ -20,6 +20,7 @@ import {
   parseWebhookRequest,
   formatValidationErrors,
 } from '../schemas/webhook.js';
+import { verifyWebhookSignature } from '../middleware/webhookAuth.js';
 import type {
   FormData,
   WebhookSuccessResponse,
@@ -32,7 +33,7 @@ const router: Router = express.Router();
  * Main webhook handler
  * Replicates the entire N8n flow
  */
-router.post('/webhook', async (req: Request, res: Response) => {
+router.post('/webhook', verifyWebhookSignature, async (req: Request, res: Response) => {
   const startTime = Date.now();
 
   // Declare formData outside try block so it's accessible in catch

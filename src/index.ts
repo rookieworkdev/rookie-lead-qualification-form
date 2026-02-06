@@ -5,6 +5,8 @@ import rateLimit from 'express-rate-limit';
 import { config } from './config/env.js';
 import { logger } from './utils/logger.js';
 import webhookRouter from './routes/webhook.js';
+// Import for Express Request type augmentation (adds rawBody property)
+import './middleware/webhookAuth.js';
 
 interface ErrorWithStatus extends Error {
   status?: number;
@@ -34,8 +36,16 @@ const limiter = rateLimit({
 
 app.use(limiter);
 
-// Body parser middleware
-app.use(express.json({ limit: '10mb' }));
+// Body parser middleware with raw body capture for webhook signature verification
+app.use(
+  express.json({
+    limit: '10mb',
+    verify: (req: Request, _res, buf) => {
+      // Store raw body buffer for HMAC signature verification
+      req.rawBody = buf;
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Request logging middleware
